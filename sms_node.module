@@ -139,7 +139,7 @@ function sms_node_admin() {
  */
 function _nodetype_autocomplete_multiple($string) {
   // The user enters a comma-separated list of users. We only autocomplete the last user.
-  $array = drupal_explode_tags($string);
+  $array = drupal_explode_tags($string); 
   // Fetch last tag
   $last_string = trim(array_pop($array));
   $matches = array();
