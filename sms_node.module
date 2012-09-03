@@ -133,9 +133,6 @@ function sms_node_admin() {
 
 /**
  * function autocpmplite multiple
- **/
-/**
- * Returns JS array for content types autocomplete fields. Supports multiple entries separated by a comma.
  */
 function _nodetype_autocomplete_multiple($string) {
   // The user enters a comma-separated list of content types. We only autocomplete the last content type.
