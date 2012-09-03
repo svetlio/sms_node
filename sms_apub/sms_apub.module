@@ -1,0 +1,159 @@
+<?php
+/**
+ * @node form alter
+ */
+function sms_apub_form_alter(&$form, $form_state, $form_id) {
+  if ($form_id == 'announcement_node_form' && arg('1') == 'add') {
+    $form['#node'] = array('name' => 'smscode');
+    $form['code'] = array(
+      '#type' => 'textfield',
+      '#title' => t('sms Code verification'),
+      '#description' => t('Enter receive an SMS code here.') . l(t('How to get the code?'), variable_get('sms_apub_help_page', t('node/25'))),
+      '#size' => 8,
+      '#maxlength' => 6,
+      '#required' => TRUE,
+      );
+      $form['#validate'][] = 'sms_apub_checkSmsCode_validate';
+      $form['#submit'][] = 'sms_apub_checkSmsCode_submit';
+  }
+}
+
+function sms_apub_checkSmsCode_validate($form, &$form_state) {
+  //Validation stuff here, set $error to true if something went wrong, or however u want to do this.  Completely up to u in how u set errors.
+  $code = $form_state['values']['code'];
+  if (strlen(utf8_decode($code) < '5') && preg_match('/[^0-9A-Za-z]/', $code)) {
+    $error = TRUE;
+  }
+  else {
+    $servID = variable_get('sms_apub_servID', '29'); //29 is default mobio test servID
+    $code = $_REQUEST["code"];
+    $ok = $_REQUEST["ok"];
+    if (_sms_checkcode($servID, $code, 0) == 1) {
+      //if code is valid, du something
+      $error = FALSE;//
+      watchdog('sms_apub', 'The @code is valid.', array('@code' => $code), WATCHDOG_NOTICE);
+    }
+    else {
+      form_set_error('smscode', t('Wrong, expired or no longer use SMS access code.'));
+      watchdog('sms_apub', 'Wrong, expired or no longer use SMS access code @code.', array('@code' => $code), WATCHDOG_ERROR);
+    }
+  }
+  if ($error) {
+    form_set_error('smscode', t('Invalid format code! Code contains only Latin letters and numbers.'));
+	watchdog('sms_apub', 'Invalid code @code! Code contains only Latin letters and numbers.', array('@code' => $code), WATCHDOG_ERROR);
+  }
+}
+
+function sms_apub_checkSmsCode_submit($form, &$form_state) {
+  //Save the new value.
+  drupal_set_message(t('The code is valid.'), 'status', FALSE);
+}
+
+/**
+ * admin settings
+ */
+function sms_apub_admin() {
+  $form = array();
+  $form['sms_apub_servID'] = array(
+    '#type' => 'textfield',
+    '#title' => t('aPub servID'),
+    '#default_value' => variable_get('sms_apub_servID', 29),
+    '#size' => 9,
+    '#maxlength' => 9,
+    '#description' => t("sms ID service on your profile on mobio.bg for your aPub service."),
+  );
+    $form['sms_apub_help_page'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Help (Info) page "How to get the code?"'),
+    '#default_value' => variable_get('sms_apub_help_page', t('node/25')),
+    '#description' => t('Path (node/25) to Help (Info) page for this servID'),
+  );
+  $form['sms_apub_servID_message'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Message'),
+    '#default_value' => variable_get('sms_apub_servID_message', t('To use the service send SMS with text KEYWORD number XXXX (prece per sms)')),
+    '#description' => t('Message for this servID'),
+  );	
+  return system_settings_form($form);
+}
+
+/**
+ * menu hook
+ */
+function sms_apub_menu() {
+  $items = array();
+  $items['admin/settings/sms_node/sms_apub'] = array(
+    'title' => 'Sms aPub settings',
+    'description' => 'Description of your Sms Mobio.bg settings page',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('sms_apub_admin'),
+    'access arguments' => array('access administration pages'), //system access administration pages
+    'type' => MENU_NORMAL_ITEM,
+    );
+  return $items;
+}
+
+/**
+* hook_help().
+*/
+function sms_apub_help($path, $arg) {
+  $output = '';  //declare your output variable
+  switch ($path) {
+    case 'admin/help#sms_apub':
+      // Return a line-break version of the module README.txt
+      return filter_filter('process', 1, NULL, file_get_contents( dirname(__FILE__) . "/README.txt") );
+     
+    case 'admin/settings/sms_node/sms_apub':
+      $output = '<p>'.  t('More help on:') . l('http://demo.sysw.info', 'http://demo.sysw.info') .'</p>';
+	  return $output;
+  }
+}
+
+/**
+ * check sms code
+ */
+function _sms_checkcode($servID, $code, $debug=0) {
+  $res_lines = file("http://www.mobio.bg/code/checkcode.php?servID=$servID&code=$code");
+  $ret = 0;
+  if ($res_lines) {
+    if (strstr("PAYBG=OK", $res_lines[0])) {
+      $ret = 1;
+    }
+    else {
+      if ($debug)
+        echo $line . "\n";
+        }
+    }
+    else {
+      if ($debug)
+        drupal_set_message(t('Unable to connect to mobio.bg server.\n'), 'error', FALSE);
+        $ret = 0;
+    }
+  return $ret;
+}
+
+/**
+* Generate HTML for the block
+* @param op the operation from the URL
+* @param delta offset
+* @returns block HTML
+*/
+function sms_apub_block($op='list', $delta=0) {
+  // set up an empty array which will contain the block contents
+  $block = array();
+  
+  $message = variable_get('sms_apub_servID_message', t('To use the service send SMS with text KEYWORD number XXXX (prece per sms)'));
+   
+  if ($op == "list") {
+    // Generate listing of blocks from this module, for the admin/block page
+    $block[0]["info"] = t('Sms aPub');
+  }
+  elseif ($op == 'view') {
+    // Generate our block content
+    $block['subject'] = t('Message for aPub');
+    $block['content'] = $message;
+  }
+
+  // return the built content
+  return $block;
+}

@@ -1,0 +1,6 @@
+name = "Sms node"
+description = "Make node Publish and Promote /vip/ with sps payment."
+core = 6.x
+package = Other
+
+dependencies[] = job_scheduler

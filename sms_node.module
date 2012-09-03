@@ -1,0 +1,359 @@
+<?php
+
+/**
+ * menu hook
+ */
+function sms_node_menu() {
+  $items = array();
+  $items['admin/settings/sms_node'] = array(
+    'title' => 'Sms Node settings',
+    'description' => 'Description of your Sms Mobio.bg settings page',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('sms_node_admin'),
+    'access arguments' => array('access administration pages'), //system access administration pages
+    'type' => MENU_NORMAL_ITEM,
+    );
+  $items['admin/settings/sms_node/sms_node/debug'] = array(
+    'title' => 'Sms Node type debug',
+    'description' => 'Description of your Sms Mobio.bg debug page',
+    'page callback' => 'sms_node_nodetype_debug_page',
+    'access arguments' => array('access administration pages'), //system access administration pages
+    'type' => MENU_NORMAL_ITEM,
+    );
+  $items['check/sms/node'] = array(
+    'title' => 'Check sms nodeID',
+    'page callback' => 'set_node_publish_promote',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+  // path with autocomplete function for node types
+  $items['nodetype/autocomplete/multiple'] = array(
+    'title' => 'Autocomplete for node type',
+    'page callback' => '_nodetype_autocomplete_multiple',
+    'access arguments' => array('access administration pages'),  //
+    'type' => MENU_CALLBACK
+  );
+  return $items;
+}
+
+//debug page for adding job scheduler for missed node types
+function sms_node_nodetype_debug_page() {
+  //check jobs
+  $node_types = variable_get('sms_publish_promote_node_type', '');
+   
+  $node_types = explode(',', $node_types);
+   
+  //existing job schedule of node types
+  $result_types = db_query("SELECT type AS type FROM {job_schedule}");
+  $nodetypes_injob = array();
+  while ($row_type = db_fetch_array($result_types)) {
+    $nodetypes_injob[] = $row_type['type'];
+  }
+  //add job for new node types
+  foreach ($node_types as $node_type) {
+    if (!in_array($node_type, $nodetypes_injob)) {
+      $result = db_query("SELECT MAX(id) AS maxid FROM {job_schedule}");
+      $row = db_fetch_array($result);
+      $job_unpublish_id = $row['maxid'] + 1;//calculate next id - id in original job scheduler table is not serial
+      $job_unpromote_id = $row['maxid'] + 2;
+      job_scheduler_sms_node_unpublish($node_type, $job_unpublish_id);
+      job_scheduler_sms_node_unpromote($node_type, $job_unpromote_id);
+    }
+  }
+  //remove jobs for older node types
+  foreach ($nodetypes_injob as $node_type_injob) {
+    if (!in_array($node_type_injob, $node_types)) {
+      $result = db_query("DELETE FROM {job_schedule} WHERE type = '%s'", $node_type_injob);
+    }
+  }
+   
+  $page_content = '';
+   
+  $page_content .= '--- // node type // last // period // periodic<p>';
+   
+  $result = db_query('SELECT*FROM {job_schedule}');
+  while ($row = db_fetch_array($result)) {
+    $un_func = $row['callback'];
+    if (strpos($un_func, 'unpublish')) {
+      $un_func = 'unpublish';
+    }
+    if (strpos($un_func, 'unpromote' )) {
+      $un_func = 'unpromote';
+    }
+    $page_content .= $un_func . '// ' . $row['type'] . '// ' . date('d/m/Y H:m:s', $row['last']) . '// ' . $row['period'] . 'sec// ' . $row['periodic'] . '<p>' ;
+  }
+  
+   
+  return $page_content;
+}
+
+function sms_node_admin() {
+  $form = array();
+  $form['pay_node'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('sms pay for node settings'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+  );
+  $form['pay_node']['sms_node_servID'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Publish servID'),
+    '#default_value' => variable_get('sms_node_servID', 29),
+    '#size' => 9,
+    '#maxlength' => 9,
+    '#description' => t("sms ID service Publish on your profile on mobio.bg for Notification of pyment."),
+  );
+  $form['pay_node']['sms_nodevip_servID'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Vip servID'),
+    '#default_value' => variable_get('sms_nodevip_servID', 29),
+    '#size' => 9,
+    '#maxlength' => 9,
+    '#description' => t("sms ID service VIP on your profile on mobio.bg for Notification of pyment."),
+  );
+  $form['pay_node']['sms_node_days'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Days'),
+    '#default_value' => variable_get('sms_node_days', 7),
+    '#size' => 9,
+    '#maxlength' => 9,
+    '#description' => t("Duration in days of visibility of the note."),
+  );
+    $form['pay_node']['sms_publish_promote_node_type'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Node types',
+    '#default_value' => variable_get('sms_publish_promote_node_type', ''),
+    '#maxlength' => 128,
+    '#autocomplete_path' => 'nodetype/autocomplete/multiple',
+    '#description' => nodetypes(),
+  );
+   
+  return system_settings_form($form);
+}
+
+/**
+ * function autocpmplite multiple
+ **/
+/**
+ * Returns JS array for users autocomplete fields. Supports multiple entries separated by a comma.
+ */
+function _nodetype_autocomplete_multiple($string) {
+  // The user enters a comma-separated list of users. We only autocomplete the last user.
+  $array = drupal_explode_tags($string);
+  // Fetch last tag
+  $last_string = trim(array_pop($array));
+  $matches = array();
+  $result = db_query_range("SELECT type FROM {node_type} WHERE LOWER(type) LIKE LOWER('%s%%')", $last_string, 0, 10);
+  $prefix = count($array) ? implode(', ', $array) .', ' : '';
+  while ($type = db_fetch_object($result)) {
+    $matches[$prefix . $type->type] = check_plain($type->type);
+  }
+   
+  exit(drupal_json($matches));
+}
+
+// get avalable node type for description
+function nodetypes() {
+  $description = t('Avalable node types: ');
+  node_get_types();
+  $nodetypes = node_get_types();
+  foreach ($nodetypes as $type) {
+    $types[] = $type->type;
+  }
+  $description .= implode(', ', $types);
+   
+  return $description;
+}
+
+//
+function job_scheduler_sms_node_unpublish($node_type, $job_unpublish_id) {
+   $job = array(
+    'callback' => 'sms_node_unpublish_nodes',
+    'type' => $node_type,
+    'id' => $job_unpublish_id,
+    'period' => 120,//2 min
+    'periodic' => TRUE,
+  );
+  job_scheduler()->set($job);
+}
+//
+function job_scheduler_sms_node_unpromote($node_type, $job_unpromote_id) {
+   $job2 = array(
+    'callback' => 'sms_node_unpromote_nodes',
+    'type' => $node_type,
+    'id' => $job_unpromote_id,
+    'period' => 120,//2 min
+    'periodic' => TRUE,
+  );
+  job_scheduler()->set($job2);
+}
+
+function set_node_publish_promote() {
+  $message = $_REQUEST["message"];
+  $item = $_REQUEST["item"];
+  $fromnum = $_REQUEST["fromnum"];
+  $extid = $_REQUEST["extid"];
+  $servID = $_REQUEST["servID"];
+  
+  $mobio_remote_addrs = array("87.120.176.216", "194.12.244.114");
+  
+  $node_type = variable_get('sms_publish_promote_node_type', 'page');
+  
+  $nid = $item;
+  $node = node_load($nid, NULL, TRUE);
+  
+  if (in_array($_SERVER['REMOTE_ADDR'], $mobio_remote_addrs)) {
+    
+    if ($servID == variable_get(sms_node_servID, 29)) {
+      $service_type = 'Publish';
+      $node -> status = 1;
+    }
+     
+    if ($servID == variable_get(sms_nodevip_servID, 29)) {
+      $service_type = 'Vip';//Promote
+      $node -> promote = 1;
+    }
+     
+    node_save(&$node);
+     
+    $today = strtotime('now');
+     
+    //register received sms payments
+    $record = (object) NULL;
+    $record->fromnum = $fromnum;
+    $record->message = $message;
+    $record->item = $nid;
+    $record->extid = $extid;
+    $record->servID = $servID;
+    $record->timestamp = $today;//time received payment
+    drupal_write_record('sms_node', $record);
+     
+    //node expiry
+    $sms_node_days = variable_get('sms_node_days', 7);//days
+    $duration_expiry = $sms_node_days * 24 * 60 * 60;//time
+    $node_expiry = $today + ($sms_node_days * 24 * 60 * 60);//expiry relative to now
+     
+    $status = '1';
+    $promote = '1';
+     
+    $result = db_query('SELECT*FROM {sms_node_expire} WHERE nid = %d LIMIT 1', $nid);
+    $row = db_fetch_array($result);
+     
+    if (db_affected_rows($result) < '1') {
+      $record = (object) NULL;
+      $record->nid = $nid;
+      if ($servID == variable_get(sms_node_servID, 29)) {
+        $record->status = $status;
+        $record->expiry_timestamp = $node_expiry;
+        
+        db_query('UPDATE {node} SET status = %d WHERE nid = %d', $status, $nid);
+      }
+      if ($servID == variable_get(sms_nodevip_servID, 29)) {
+        $record->promote = $promote;
+        $record->expiry_vip_timestamp = $node_expiry;
+        
+        db_query('UPDATE {node} SET promote = %d WHERE nid = %d', $promote, $nid);
+      }
+      drupal_write_record('sms_node_expire', $record);
+    }
+    else {
+      if ($servID == variable_get(sms_node_servID, 29)) {
+        if ($row['status'] == '1') {
+          db_query('UPDATE {sms_node_expire} SET expiry_timestamp = expiry_timestamp + %d WHERE nid = %d', $duration_expiry, $nid);
+        }
+        else {
+          db_query('UPDATE {sms_node_expire} SET expiry_timestamp = %d, status = %d WHERE nid = %d', $node_expiry, $status, $nid);
+          db_query('UPDATE {node} SET status = %d WHERE nid = %d', $status, $nid);
+        }
+      }
+      if ($servID == variable_get(sms_nodevip_servID, 29)) {
+        if ($row['promote'] == '1') {
+          db_query('UPDATE {sms_node_expire} SET expiry_vip_timestamp = expiry_vip_timestamp + %d WHERE nid = %d', $duration_expiry, $nid);
+        }
+        else {
+          db_query('UPDATE {sms_node_expire} SET expiry_vip_timestamp = %d, promote = %d WHERE nid = %d', $node_expiry, $promote, $nid);
+          db_query('UPDATE {node} SET promote = %d WHERE nid = %d', $promote, $nid);
+        }
+      }
+    }      
+    //wachdog
+    $limit = '1';
+    $result = db_query('SELECT*FROM {sms_node_expire} WHERE nid = %d LIMIT %d', $nid, $limit);
+    $row = db_fetch_array($result);
+     
+    if ($servID == variable_get(sms_node_servID, 29)) {
+      $exp = $row['expiry_timestamp'];
+    }
+     
+    if ($servID == variable_get(sms_nodevip_servID, 29)) {
+      $exp = $row['expiry_vip_timestamp'];
+    }
+     
+    $date_exp = date('d/m/Y H:m:s', $exp);
+     
+    $ntype = ucfirst($node->type);
+    $sms_reply = "Uspeshna obrabotka. " . "$ntype $nid - $service_type to $date_exp.";
+    // your script action ends
+    file("http://mobio.bg/paynotify/pnsendsms.php?servID=$servID&tonum=$fromnum&extid=$extid&message=" . urlencode($sms_reply));
+  }
+}
+
+//sms_node_unPublish_nodes
+function sms_node_unpublish_nodes($job) {
+  $now = strtotime('now');
+  $result = db_query('SELECT*FROM {sms_node_expire} WHERE expiry_timestamp < %d AND status = 1', $now);
+  if (db_affected_rows($result > '0')) {
+    $nids = array();
+    while ($row = db_fetch_array($result)) {
+      $nid = $row['nid'];
+      $nids[] = $nid; 
+      db_query('UPDATE {node} SET status = 0 WHERE nid = %d', $nid);
+      db_query('UPDATE {sms_node_expire} SET status = 0 WHERE nid = %d', $nid);
+    }
+    $n_ids = implode(',', $nids);
+    watchdog('sms_node', 'Note/s @nodes_id is unpublished.', array('@nodes_id' => $n_ids), WATCHDOG_NOTICE);
+  }
+}
+
+//sms_node_unPromote_nodes
+function sms_node_unpromote_nodes($job) {
+  $now = strtotime('now');
+  $result = db_query("SELECT*FROM {sms_node_expire} WHERE expiry_vip_timestamp < '%d' AND promote = 1", $now);
+  if (db_affected_rows($result > '0')) {
+    $nids = array();
+    while ($row = db_fetch_array($result)) {
+      $nid = $row['nid'];
+      $nids[] = $nid; 
+      db_query('UPDATE {node} SET promote = 0 WHERE nid = %d', $nid);
+      db_query('UPDATE {sms_node_expire} SET promote = 0 WHERE nid = %d', $nid);
+    }
+    $n_ids = implode(',', $nids);
+    watchdog('sms_node', 'Note/s @nodes_id is unpromoted.', array('@nodes_id' => $n_ids), WATCHDOG_NOTICE);
+  }
+}
+
+/*
+ *  hook_help
+ */
+function sms_node_help($path, $arg) {
+  switch ($path) {
+    case 'admin/help#sms_node':
+      return '<p>' . t('More help on:') . l('http://demo.sysw.info', 'http://demo.sysw.info') .'</p>';
+      
+    // Help for another path in the block module
+    case 'admin/settings/sms_mobio/sms_node':
+      return '<p>' . t('More help on:') . l('http://demo.sysw.info', 'http://demo.sysw.info') .'</p>';
+  }
+}
+
+/**
+ *  Implementation of hook_views_api().
+ */
+function sms_node_views_api() {
+  return array(
+    'api' => 2,
+    'path' => drupal_get_path('module', 'sms_node'),    
+  );
+}
+
+

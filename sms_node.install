@@ -1,0 +1,110 @@
+<?php
+// $Id$ 
+
+/**
+ * @file
+ * Sms node install.
+ */
+
+
+/**
+ * Implementation of hook_schema().
+ */
+function sms_node_schema() {
+  $schema['sms_node'] = array(
+    'description' => t('Expiration time for the user roles.'),
+    'fields' => array(
+      'smsid' => array(
+        'type' => 'serial',
+        'description' => t('sms id.')
+      ),
+      'fromnum' => array(
+        'type' => 'int',
+        'default' => 0,
+        'description' => 'sent from number.',
+      ),
+      'message' => array(
+        'type' => 'varchar',
+        'length' => 180,
+        'default' => 0,
+        'description' => 'sent message.',
+      ),
+      'item' => array(
+        'type' => 'varchar',
+        'length' => 160,
+        'default' => 0,
+        'description' => 'sent item.',
+      ),
+      'extid' => array(
+        'type' => 'int',
+        'length' => 10,
+        'default' => 0,
+        'description' => 'extid.',
+      ),
+      'servID' => array(
+        'type' => 'int',
+        'length' => 10,
+        'default' => 0,
+        'description' => 'service id',
+      ),
+       'timestamp' => array(
+        'type' => 'int',//current timestamp
+        'length' => 20,
+        'default' => 0,
+        'description' => t('now timestamp'),
+      )
+    ),
+    'primary key' => array('smsid'),
+  );
+  $schema['sms_node_expire'] = array(
+    'description' => t('Length in days to assign each role by default.'),
+    'fields' => array(
+      'nid' => array(
+        'type' => 'int',
+        'description' => t('The role_id.')
+      ),
+      'expiry_timestamp' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => t('post Publish expiration time.'),
+      ),
+      'expiry_vip_timestamp' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => t('post Promote/VIP expiration time.'),
+      ),
+      'status' => array(
+        'type' => 'int',//
+        'default' => 0,
+        'description' => t('status Publish'),
+      ),
+      'promote' => array(
+        'type' => 'int',//
+        'default' => 0,
+        'description' => t('status Promote'),
+      )
+    ),
+    'primary key' => array('nid'),
+  );
+  return $schema;
+}
+
+/**
+ * Implementation of hook_install().
+ */
+function sms_node_install() {
+  drupal_install_schema('sms_node');//tables
+  
+//  job_scheduler_sms_node_unpublish();//add job scheduler for unPublish
+//  job_scheduler_sms_node_unpromote();//add job sheduler for unPromote
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function sms_node_uninstall() {
+  drupal_uninstall_schema('sms_node');
+}
+ 

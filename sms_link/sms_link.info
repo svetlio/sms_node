@@ -1,0 +1,10 @@
+name = "Sms link"
+description = "Create a link node in site with sms."
+core = 6.x
+package = Other
+
+dependencies[] = sms_node
+dependencies[] = auto_nodetitle
+dependencies[] = link
+dependencies[] = content
+dependencies[] = views

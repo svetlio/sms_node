@@ -1,0 +1,134 @@
+<?php
+// $Id$ 
+
+/**
+ * @file
+ * Sms link install.
+ */
+
+/**
+ * Implementation of hook_install().
+ */
+function sms_link_install() {
+  variable_set('sms_link_servID', '29');
+  variable_set('sms_link_nodetype', 'sms_link');
+  variable_set('sms_link_cckfield', 'field_link');
+  //create sms_link node type and field_link
+  // CCK content_copy.module may not be enabled, so make sure it is included
+  require_once './' . drupal_get_path('module', 'content') .  '/modules/content_copy/content_copy.module';
+  module_load_include('inc', 'sms_link', 'sms_link.cckdef');
+  $content = _sms_link_export();  // in modulename.ccknodedef.inc
+  $form_state['values']['type_name'] = '<create>'; //don't use <create> here as you want to extend existing content type, use 'module_name' for ad field to existing node type
+  $form_state['values']['macro'] = '$content = ' . var_export($content, TRUE) . ';';
+  // form provided by content_copy.module
+  drupal_execute('content_copy_import_form', $form_state);
+  content_clear_type_cache();
+  //create views block sms link
+  _create_view_block_sms_link();
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function sms_link_uninstall() {
+  node_type_delete('sms_link');
+  //delete variables
+  variable_del('sms_link_servID');
+  variable_del('sms_link_nodetype');
+  variable_del('sms_link_cckfield');
+  //delete views block sms_links
+  $view = views_ui_cache_load('sms_links');
+  $view->delete();
+  views_object_cache_clear('view', $view->name);
+}
+
+//create a view block
+function _create_view_block_sms_link() {
+  $view = views_new_view();
+  $view->name = 'sms_links';
+  $view->description = 'View block with sended sms links';
+  $view->tag = 'Default';
+  $view->view_php = '';
+  $view->base_table = 'node';
+  $view->is_cacheable = FALSE;
+  $view->api_version = 2;
+  $view->disabled = FALSE; /* Edit this to TRUE to make a default view disabled initially */
+  $handler = $view->new_display('default', 'Defaults', 'default');
+  $handler->override_option('fields', array(
+    'field_link_url' => array(
+      'label' => '',
+      'alter' => array(
+        'alter_text' => 0,
+        'text' => '',
+        'make_link' => 0,
+        'path' => '',
+        'link_class' => '',
+        'alt' => '',
+        'prefix' => '',
+        'suffix' => '',
+        'target' => '',
+        'help' => '',
+        'trim' => 0,
+        'max_length' => '',
+        'word_boundary' => 1,
+        'ellipsis' => 1,
+        'html' => 0,
+        'strip_tags' => 0,
+      ),
+      'empty' => '',
+      'hide_empty' => 0,
+      'empty_zero' => 0,
+      'link_to_node' => 0,
+      'label_type' => 'none',
+      'format' => 'default',
+      'multiple' => array(
+        'group' => TRUE,
+        'multiple_number' => '',
+        'multiple_from' => '',
+        'multiple_reversed' => FALSE,
+      ),
+      'exclude' => 0,
+      'id' => 'field_link_url',
+      'table' => 'node_data_field_link',
+      'field' => 'field_link_url',
+      'override' => array(
+        'button' => 'Override',
+      ),
+      'relationship' => 'none',
+    ),
+  ));
+  $handler->override_option('filters', array(
+    'type' => array(
+      'operator' => 'in',
+      'value' => array(
+        'sms_link' => 'sms_link',
+      ),
+      'group' => '0',
+      'exposed' => FALSE,
+      'expose' => array(
+        'operator' => FALSE,
+        'label' => '',
+      ),
+      'id' => 'type',
+      'table' => 'node',
+      'field' => 'type',
+      'override' => array(
+        'button' => 'Override',
+      ),
+      'relationship' => 'none',
+    ),
+  ));
+  $handler->override_option('access', array(
+    'type' => 'none',
+  ));
+  $handler->override_option('cache', array(
+    'type' => 'none',
+  ));
+  $handler->override_option('title', 'sms links');
+  $handler = $view->new_display('block', 'Блок', 'block_1');
+  $handler->override_option('block_description', '');
+  $handler->override_option('block_caching', -1);
+  
+  $view->execute_display('block', array());  
+  $view->save();
+}

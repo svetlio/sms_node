@@ -1,0 +1,132 @@
+<?php
+
+/**
+ * menu hook
+ */
+function sms_link_menu() {
+  $items = array();
+  $items['admin/settings/sms_node/sms_link'] = array(
+    'title' => 'Sms Link settings',
+    'description' => 'Description of your Sms Mobio.bg settings page',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('sms_link_admin'),
+    'access arguments' => array('access administration pages'), //system access administration pages
+    'type' => MENU_LOCAL_TASK,//MENU_NORMAL_ITEM,
+    'weight' => 2,
+    );
+  $items['check/sms/link'] = array(
+    'title' => 'Check sms link',
+    'page callback' => 'save_sms_link',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+   
+  return $items;
+}
+
+//admin settings page form
+function sms_link_admin() {
+  $form = array();
+  $form['sms_link_servID'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Link servID'),
+    '#default_value' => variable_get('sms_link_servID', 29),
+    '#size' => 9,
+    '#maxlength' => 9,
+    '#description' => t("sms ID service Link on your profile on mobio.bg."),
+  );
+  $form['sms_link_delimiter'] = array(
+    '#type' => 'textfield',
+    '#title' => t('sms word delimiter'),
+    '#default_value' => variable_get('sms_link_delimiter', '::'),
+    '#size' => 3,
+    '#maxlength' => 3,
+    '#description' => t("Separator words of address and the title in the SMS message to the client. Same as :: or ##. Use symbols that would never have been included in the same combination /as two consecutive equal signs/ address in a connection or its title. The maximum length is three characters."),
+  );
+  //get all node type
+  $result = db_query('SELECT * FROM {node_type}');
+  $opt_type = array();
+  $opt_nodetype = array();
+  while ($row = db_fetch_array($result)) {
+    $type = $row['type'];
+    $opt_nodetype["$type"] = $row['name'];
+  }
+  $form['sms_link_nodetype'] = array(
+    '#type' => 'select',
+    '#title' => t('Node type'),
+    '#default_value' => variable_get('sms_link_nodetype', 'sms_link'),
+    '#options' => $opt_nodetype,
+    '#description' => t('Available types.'),
+  );
+  return system_settings_form($form);
+}
+
+function save_sms_link() {
+  $message = $_REQUEST["message"];
+  $item = $_REQUEST["item"];
+  $fromnum = $_REQUEST["fromnum"];
+  $extid = $_REQUEST["extid"];
+  $servID = $_REQUEST["servID"];
+  
+  $mobio_remote_addrs = array("87.120.176.216", "194.12.244.114");
+  
+  if (in_array($_SERVER['REMOTE_ADDR'], $mobio_remote_addrs)) {
+   
+    $today = strtotime('now');
+     
+    //register received sms payments
+    $record = (object) NULL;
+    $record->fromnum = $fromnum;
+    $record->message = $message;
+    $record->item = $nid;
+    $record->extid = $extid;
+    $record->servID = $servID;
+    $record->timestamp = $today;//time received payment
+    drupal_write_record('sms_node', $record);
+    
+    $node_type = variable_get('sms_link_nodetype', 'sms_link');
+    
+    $item = explode(variable_get('sms_link_delimiter', '::'), $item);
+    $url = $item['0'];
+    $title = $item['1'];
+    
+    //Create node
+    $node = new stdClass();
+     
+    $node->type = $node_type;
+     
+    //Field
+    $node->field_link = array(
+      0 => array(
+        'url' => $url,
+        'title' => $title,
+      ),
+    );
+    node_save(&$node);
+     
+    watchdog('sms_link', 'Link @link from @num is saved.', array('@link' => $url, '@num' => $fromnum), WATCHDOG_NOTICE);
+     
+    $sms_reply = "Uspeshna obrabotka.";
+    // your script action ends
+    file("http://mobio.bg/paynotify/pnsendsms.php?servID=$servID&tonum=$fromnum&extid=$extid&message=" . urlencode($sms_reply));
+  }
+}
+
+/*
+ * Display help and module information
+ * @param path which path of the site we're displaying help
+ * @param arg array that holds the current path as would be returned from arg() function
+ * @return help text for the path
+ */
+function sms_link_help($path, $arg) {
+  $output = '';  //declare your output variable
+  switch ($path) {
+    case "admin/help#sms_link":
+	  $output = '<p>'.  t('More help on:') . l('http://demo.sysw.info', 'http://demo.sysw.info') .'</p>';
+	  return $output;
+      
+	case "admin/settings/sms_node/sms_link":
+	  $output = '<p>'.  t('More help on:') . l('http://demo.sysw.info', 'http://demo.sysw.info') .'</p>';
+	  return $output;
+  }
+} // function your_first_module_help

@@ -1,0 +1,81 @@
+# $Id$
+#
+# Bulgarian translation of Drupal (general)
+# Copyright 2011 Svetoslav Stoyanov sve@d-support.eu
+# Generated from files:
+#  sms_apub.module: n/a
+#  sms_apub.info: n/a
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"POT-Creation-Date: 2011-04-10 17:23+0300\n"
+"PO-Revision-Date: 2011-04-10 17:23+0300\n"
+"Last-Translator: NAME <EMAIL@ADDRESS>\n"
+"Language-Team: Bulgarian <EMAIL@ADDRESS>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=0; plural=;\n"
+
+#: sms_apub.module:14
+msgid "sms Code verification"
+msgstr "Проверка на смс кода"
+
+#: sms_apub.module:15
+msgid "Enter receive an SMS code here."
+msgstr "Въведете полученият като смс код тук."
+
+#: sms_apub.module:24
+msgid "Editing a announcement node!"
+msgstr ""
+
+#: sms_apub.module:41
+msgid "All is OK!"
+msgstr ""
+
+#: sms_apub.module:61
+msgid "Unable to connect to mobio.bg server.\\n"
+msgstr ""
+
+#: sms_apub.module:75
+msgid "aPub servID"
+msgstr ""
+
+#: sms_apub.module:79
+msgid "sms ID service on your profile on mobio.bg for your service."
+msgstr ""
+
+#: sms_apub.module:111
+msgid "More help on:"
+msgstr ""
+
+#: sms_apub.module:120
+msgid "You must enter an number for the sms service ID."
+msgstr ""
+
+#: sms_apub.module:123
+msgid "Maximum number must be positive."
+msgstr ""
+
+#: sms_apub.module:90
+msgid "Sms aPub settings"
+msgstr ""
+
+#: sms_apub.module:91
+msgid "Description of your Sms Mobio.bg settings page"
+msgstr ""
+
+#: sms_apub.info:0
+msgid "Sms a.publish"
+msgstr ""
+
+#: sms_apub.info:0
+msgid "Page published with sms code verification."
+msgstr ""
+
+#: sms_apub.info:0
+msgid "Other"
+msgstr ""
+
